@@ -24,14 +24,16 @@ with zero proxy. The single muxed UDP port (7882) keeps the firewall trivial too
 The server binds the host's real ports. Open just these three on the firewall /
 security group:
 
-| Port  | Proto | Purpose                                  |
-| ----- | ----- | ---------------------------------------- |
-| 7880  | TCP   | HTTP/WebSocket signaling + API           |
-| 7881  | TCP   | RTC over TCP (UDP fallback)              |
-| 7882  | UDP   | RTC media (all sessions muxed onto this) |
+| Port        | Proto | Purpose                                |
+| ----------- | ----- | -------------------------------------- |
+| 7880        | TCP   | HTTP/WebSocket signaling + API         |
+| 7881        | TCP   | RTC over TCP (UDP fallback)            |
+| 7882-7892   | UDP   | RTC media (UDP mux, all sessions)      |
 
-Media uses a single muxed UDP port (`rtc.udp_port`), not a 50000-60000 range.
-One port, simple firewall, and nothing wide to ever accidentally publish.
+Media uses a UDP mux range (`rtc.udp_port: 7882-7892`), not the default
+50000-60000. LiveKit recommends a range >= the machine's vCPU count
+(config-sample.yaml); 11 ports suits this box. Tiny firewall, nothing wide to
+ever accidentally publish.
 
 `use_external_ip: true` is set so LiveKit advertises the VM's public IP in ICE
 candidates. On a NATed host this is required or clients never connect.

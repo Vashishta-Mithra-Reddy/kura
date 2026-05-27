@@ -16,10 +16,13 @@ services:
         log_level: info
         rtc:
           tcp_port: 7881
-          # Single muxed UDP port for all media instead of a 50000-60000 range.
-          # All sessions demux over this one port - far simpler firewall, and no
-          # giant port range to ever accidentally publish.
-          udp_port: 7882
+          # UDP mux: all media goes through this small port range instead of the
+          # default 50000-60000. LiveKit recommends a range >= number of vCPUs
+          # (config-sample.yaml). 11 ports is plenty for this box. Mutually
+          # exclusive with port_range_start/end (do not set those).
+          # Safe because host networking publishes ZERO ports via docker-proxy -
+          # only a *published* wide range storms the host, never this.
+          udp_port: 7882-7892
           # Required on a NAT'd / cloud VM so LiveKit advertises the public IP.
           use_external_ip: true
         keys:
