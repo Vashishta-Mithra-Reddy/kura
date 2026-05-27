@@ -6,6 +6,10 @@ Docker Compose stack deployed independently on Dokploy.
 > kura (蔵) - a traditional Japanese storehouse. This repo is the storehouse for the
 > services that sit beneath the apps.
 
+**Deploying or debugging an outage? Read [RUNBOOK.md](RUNBOOK.md) first** - Dokploy
+internals, the deploy flow, firewall/TLS, and the recovery procedures for the failures
+we have actually hit.
+
 ## Layout
 
 ```
