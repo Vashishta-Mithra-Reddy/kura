@@ -2,9 +2,13 @@ services:
   livekit:
     image: ${LIVEKIT_IMAGE:-livekit/livekit-server:latest}
     restart: unless-stopped
-    # Config is read from the LIVEKIT_CONFIG env var (this is the name the image
-    # actually reads - NOT LIVEKIT_CONFIG_BODY). ${...} refs are interpolated by
-    # Dokploy from the app environment, same as the ekam compose.
+    # Host networking on purpose: publishing the UDP media range via `ports:`
+    # makes Docker spawn a docker-proxy process per port (10k+), which can pin
+    # CPU and hang the whole host. Host net binds the ports directly, zero proxy.
+    # This is LiveKit's recommended deployment for exactly this reason.
+    network_mode: host
+    # Config is read from LIVEKIT_CONFIG (the name the image reads - NOT
+    # LIVEKIT_CONFIG_BODY). ${...} refs are interpolated by Dokploy from the env.
     environment:
       LIVEKIT_CONFIG: |
         port: 7880
@@ -20,13 +24,6 @@ services:
           api_key: "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}"
           urls:
             - "${LIVEKIT_WEBHOOK_URL:?set LIVEKIT_WEBHOOK_URL}"
-    # 7880 is signaling (wss) - expose it so Dokploy/Traefik routes the domain to it.
-    # 7881/udp range are media and must be published directly; the proxy can't carry them.
-    expose:
-      - "7880"
-    ports:
-      - "7881:7881/tcp"
-      - "50000-60000:50000-60000/udp"
     deploy:
       resources:
         limits:

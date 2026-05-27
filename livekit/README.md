@@ -15,25 +15,27 @@ Mirrors the proven ekam compose. One file to edit.
 
 ## The gotchas (read before deploying)
 
-**WebRTC is not HTTP.** Traefik / the Dokploy reverse proxy only handles HTTP(S).
-Signaling (7880) goes through the proxy via the app's domain (`expose`d, point the
-Dokploy domain at port 7880, served as `wss://`). Media (7881 + the UDP range) is
-published directly with `ports:` because the proxy can't carry it.
+**Host networking, not port publishing.** This stack uses `network_mode: host`.
+Do NOT switch to `ports:` for the UDP media range - publishing 50000-60000 makes
+Docker spawn a `docker-proxy` process per port (10k+), which can pin CPU and hang
+the entire host. Host net binds the ports directly with zero proxy overhead.
 
-Open these on the host firewall / cloud security group:
+The server binds the host's real ports. Open these on the firewall / security group:
 
 | Port          | Proto | Purpose                          |
 | ------------- | ----- | -------------------------------- |
-| 7880          | TCP   | HTTP/WebSocket signaling (via proxy domain) |
+| 7880          | TCP   | HTTP/WebSocket signaling + API   |
 | 7881          | TCP   | RTC over TCP (UDP fallback)      |
 | 50000-60000   | UDP   | RTC media                        |
 
 `use_external_ip: true` is set so LiveKit advertises the VM's public IP in ICE
 candidates. On a NATed host this is required or clients never connect.
 
-**Signaling TLS.** Clients connect to `wss://`. Dokploy/Traefik terminates TLS for
-the domain pointed at port 7880. Media on 50000-60000/UDP is encrypted by WebRTC
-(DTLS-SRTP) regardless.
+**Signaling TLS.** With host networking, Dokploy's Traefik does NOT auto-route
+7880 - the server binds the host directly. Clients connect to `wss://`, so put TLS
+in front of 7880 yourself: a Cloudflare proxied DNS record, or a standalone
+reverse proxy / LiveKit's built-in TLS. Media on 50000-60000/UDP is encrypted by
+WebRTC (DTLS-SRTP) regardless.
 
 **Secret parity.** `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` here MUST equal the
 values ekam uses. Mismatch = every token rejected. Single source of truth, document
