@@ -9,29 +9,31 @@ Self-hosted [LiveKit](https://livekit.io) WebRTC media server for ekam voice.
 3. Deploy.
 
 There is no `livekit.yaml`. The full server config lives inline in
-`docker-compose.yml` as `LIVEKIT_CONFIG_BODY`, with `${...}` placeholders filled
-from the env above. One file to edit, no mounted-config substitution gotchas.
+`docker-compose.yml` under the `LIVEKIT_CONFIG` env var (the name the image reads -
+NOT `LIVEKIT_CONFIG_BODY`), with `${...}` placeholders filled from the env above.
+Mirrors the proven ekam compose. One file to edit.
 
 ## The gotchas (read before deploying)
 
 **WebRTC is not HTTP.** Traefik / the Dokploy reverse proxy only handles HTTP(S).
-LiveKit media flows over UDP and a TCP fallback that the proxy does not touch. This
-stack uses `network_mode: host` so the server binds the VM's real ports directly.
+Signaling (7880) goes through the proxy via the app's domain (`expose`d, point the
+Dokploy domain at port 7880, served as `wss://`). Media (7881 + the UDP range) is
+published directly with `ports:` because the proxy can't carry it.
 
 Open these on the host firewall / cloud security group:
 
 | Port          | Proto | Purpose                          |
 | ------------- | ----- | -------------------------------- |
-| 7880          | TCP   | HTTP/WebSocket signaling + API   |
+| 7880          | TCP   | HTTP/WebSocket signaling (via proxy domain) |
 | 7881          | TCP   | RTC over TCP (UDP fallback)      |
-| 50000-50100   | UDP   | RTC media                        |
+| 50000-60000   | UDP   | RTC media                        |
 
 `use_external_ip: true` is set so LiveKit advertises the VM's public IP in ICE
 candidates. On a NATed host this is required or clients never connect.
 
-**Signaling TLS.** Clients connect to `wss://`. Terminate TLS for port 7880 either
-via a thin Traefik HTTP route (signaling only) or LiveKit's built-in TLS. Media on
-50000-50100/UDP is encrypted by WebRTC (DTLS-SRTP) regardless.
+**Signaling TLS.** Clients connect to `wss://`. Dokploy/Traefik terminates TLS for
+the domain pointed at port 7880. Media on 50000-60000/UDP is encrypted by WebRTC
+(DTLS-SRTP) regardless.
 
 **Secret parity.** `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` here MUST equal the
 values ekam uses. Mismatch = every token rejected. Single source of truth, document

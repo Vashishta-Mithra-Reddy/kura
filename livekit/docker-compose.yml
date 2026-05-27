@@ -1,27 +1,35 @@
 services:
   livekit:
-    image: livekit/livekit-server:v1.8
+    image: ${LIVEKIT_IMAGE:-livekit/livekit-server:latest}
     restart: unless-stopped
-    # WebRTC needs the host's real ports, not Traefik HTTP proxying.
-    # host networking is the simplest reliable setup for ICE/UDP.
-    network_mode: host
-    # Entire config passed as an env var. Compose substitutes the ${...} refs
-    # below from Dokploy's environment - no mounted file, no volume substitution
-    # surprises. This is the single source of truth for the server config.
+    # Config is read from the LIVEKIT_CONFIG env var (this is the name the image
+    # actually reads - NOT LIVEKIT_CONFIG_BODY). ${...} refs are interpolated by
+    # Dokploy from the app environment, same as the ekam compose.
     environment:
-      LIVEKIT_CONFIG_BODY: |
+      LIVEKIT_CONFIG: |
         port: 7880
+        log_level: info
         rtc:
           tcp_port: 7881
           port_range_start: 50000
-          port_range_end: 50100
+          port_range_end: 60000
           use_external_ip: true
         keys:
-          ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+          "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}": "${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET}"
         webhook:
-          api_key: ${LIVEKIT_API_KEY}
+          api_key: "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}"
           urls:
-            - ${LIVEKIT_WEBHOOK_URL}
-        logging:
-          level: info
-          json: false
+            - "${LIVEKIT_WEBHOOK_URL:?set LIVEKIT_WEBHOOK_URL}"
+    # 7880 is signaling (wss) - expose it so Dokploy/Traefik routes the domain to it.
+    # 7881/udp range are media and must be published directly; the proxy can't carry them.
+    expose:
+      - "7880"
+    ports:
+      - "7881:7881/tcp"
+      - "50000-60000:50000-60000/udp"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
