@@ -8,6 +8,10 @@ Self-hosted [LiveKit](https://livekit.io) WebRTC media server for ekam voice.
 2. Set env from `.env.example` (Dokploy env UI, not a committed file).
 3. Deploy.
 
+There is no `livekit.yaml`. The full server config lives inline in
+`docker-compose.yml` as `LIVEKIT_CONFIG_BODY`, with `${...}` placeholders filled
+from the env above. One file to edit, no mounted-config substitution gotchas.
+
 ## The gotchas (read before deploying)
 
 **WebRTC is not HTTP.** Traefik / the Dokploy reverse proxy only handles HTTP(S).

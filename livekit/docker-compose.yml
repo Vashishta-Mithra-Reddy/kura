@@ -5,10 +5,23 @@ services:
     # WebRTC needs the host's real ports, not Traefik HTTP proxying.
     # host networking is the simplest reliable setup for ICE/UDP.
     network_mode: host
-    command: --config /etc/livekit.yaml
-    volumes:
-      - ./livekit.yaml:/etc/livekit.yaml:ro
+    # Entire config passed as an env var. Compose substitutes the ${...} refs
+    # below from Dokploy's environment - no mounted file, no volume substitution
+    # surprises. This is the single source of truth for the server config.
     environment:
-      # Keys are injected into livekit.yaml via env-substitution at deploy,
-      # OR hardcoded in livekit.yaml. See README for the two approaches.
-      - LIVEKIT_KEYS=${LIVEKIT_API_KEY}:${LIVEKIT_API_SECRET}
+      LIVEKIT_CONFIG_BODY: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          port_range_start: 50000
+          port_range_end: 50100
+          use_external_ip: true
+        keys:
+          ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY}
+          urls:
+            - ${LIVEKIT_WEBHOOK_URL}
+        logging:
+          level: info
+          json: false
