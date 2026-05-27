@@ -1,0 +1,13 @@
+# Local env files - never commit real secrets
+.env
+*/.env
+**/.env.local
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Runtime data volumes mounted locally
+**/data/

@@ -1,0 +1,14 @@
+services:
+  livekit:
+    image: livekit/livekit-server:v1.8
+    restart: unless-stopped
+    # WebRTC needs the host's real ports, not Traefik HTTP proxying.
+    # host networking is the simplest reliable setup for ICE/UDP.
+    network_mode: host
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      # Keys are injected into livekit.yaml via env-substitution at deploy,
+      # OR hardcoded in livekit.yaml. See README for the two approaches.
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY}:${LIVEKIT_API_SECRET}
