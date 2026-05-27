@@ -16,17 +16,22 @@ Mirrors the proven ekam compose. One file to edit.
 ## The gotchas (read before deploying)
 
 **Host networking, not port publishing.** This stack uses `network_mode: host`.
-Do NOT switch to `ports:` for the UDP media range - publishing 50000-60000 makes
-Docker spawn a `docker-proxy` process per port (10k+), which can pin CPU and hang
-the entire host. Host net binds the ports directly with zero proxy overhead.
+Do NOT switch this service to `ports:`. Publishing a UDP range (e.g. 50000-60000)
+makes Docker spawn a `docker-proxy` process per port (10k+), which pins CPU and
+hangs the entire host - this caused a real outage. Host net binds ports directly
+with zero proxy. The single muxed UDP port (7882) keeps the firewall trivial too.
 
-The server binds the host's real ports. Open these on the firewall / security group:
+The server binds the host's real ports. Open just these three on the firewall /
+security group:
 
-| Port          | Proto | Purpose                          |
-| ------------- | ----- | -------------------------------- |
-| 7880          | TCP   | HTTP/WebSocket signaling + API   |
-| 7881          | TCP   | RTC over TCP (UDP fallback)      |
-| 50000-60000   | UDP   | RTC media                        |
+| Port  | Proto | Purpose                                  |
+| ----- | ----- | ---------------------------------------- |
+| 7880  | TCP   | HTTP/WebSocket signaling + API           |
+| 7881  | TCP   | RTC over TCP (UDP fallback)              |
+| 7882  | UDP   | RTC media (all sessions muxed onto this) |
+
+Media uses a single muxed UDP port (`rtc.udp_port`), not a 50000-60000 range.
+One port, simple firewall, and nothing wide to ever accidentally publish.
 
 `use_external_ip: true` is set so LiveKit advertises the VM's public IP in ICE
 candidates. On a NATed host this is required or clients never connect.
