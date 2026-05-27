@@ -58,13 +58,35 @@ Config verified against LiveKit source (`cmd/server/main.go`, `config-sample.yam
   LiveKit recommends a range >= the machine's vCPU count.
 - Redis is **not required** for a single node (only enables distributed mode).
 
-### Ports to open (Hetzner Cloud firewall + any host ufw)
+### Ports to open
 
 | Port        | Proto | Purpose                        |
 | ----------- | ----- | ------------------------------ |
 | 7880        | TCP   | HTTP/WebSocket signaling + API |
 | 7881        | TCP   | RTC over TCP (UDP fallback)    |
 | 7882-7892   | UDP   | RTC media (UDP mux)            |
+
+**TWO firewall layers - both must allow, or you get a silent timeout:**
+
+1. **Hetzner Cloud Firewall** (web UI): add inbound rules, source Any IPv4 + Any IPv6.
+   UDP range port field = `7882-7892`. Confirm the firewall is **attached to the
+   server** under its Resources tab, not just created.
+2. **Host `ufw`** (it is active on this box): mirror the rules. ufw uses `:` for ranges.
+   ```sh
+   sudo ufw allow 7880/tcp comment 'LiveKit signaling'
+   sudo ufw allow 7881/tcp comment 'LiveKit TCP fallback'
+   sudo ufw allow 7882:7892/udp comment 'LiveKit media'
+   sudo ufw status
+   ```
+
+Diagnosing a timeout (host networking, so no `ports:` mapping is involved):
+```sh
+sudo ss -tlnp | grep 7880          # want *:7880, proves it listens on all interfaces
+curl -s http://localhost:7880/     # OK = server up
+curl -s http://<public-ip>:7880/   # OK from box but timeout externally = a firewall layer
+sudo ufw status                    # is the port listed?
+```
+Note: SSH on this box is port **2222**, not 22 (ufw rule reflects that).
 
 ### TLS / wss
 
