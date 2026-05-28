@@ -2,28 +2,23 @@ services:
   livekit:
     image: ${LIVEKIT_IMAGE:-livekit/livekit-server:latest}
     restart: unless-stopped
-    # Host networking is LiveKit's recommended production mode AND the thing that
-    # makes this crash-proof: it publishes ZERO ports through Docker, so the
-    # docker-proxy-per-port storm (which took the box down) cannot happen.
-    # Never switch this service to `ports:` - that is what caused the outage.
-    network_mode: host
-    # Config is read from the LIVEKIT_CONFIG env var (the name the image reads -
-    # NOT LIVEKIT_CONFIG_BODY). ${...} refs are interpolated by Dokploy. Matches
-    # the proven ekam compose on this same host.
+    # Bridge network (NOT host) so Dokploy's Traefik can reach the container and
+    # terminate TLS for the wss domain - this mirrors LiveKit's official deploy,
+    # where a Caddy reverse proxy fronts port 7880. Traefik plays Caddy's role.
+    networks:
+      - dokploy-network
+    # Config is read from LIVEKIT_CONFIG (the name the image reads - NOT
+    # LIVEKIT_CONFIG_BODY). ${...} refs are interpolated by Dokploy from the env.
     environment:
       LIVEKIT_CONFIG: |
         port: 7880
         log_level: info
         rtc:
           tcp_port: 7881
-          # UDP mux: all media goes through this small port range instead of the
-          # default 50000-60000. LiveKit recommends a range >= number of vCPUs
-          # (config-sample.yaml). 11 ports is plenty for this box. Mutually
-          # exclusive with port_range_start/end (do not set those).
-          # Safe because host networking publishes ZERO ports via docker-proxy -
-          # only a *published* wide range storms the host, never this.
+          # UDP mux range (LiveKit recommends >= vCPU count). 11 ports - safe to
+          # publish. The original outage was from publishing the 50000-60000
+          # default (10k ports = docker-proxy storm). Never widen this range.
           udp_port: 7882-7892
-          # Required on a NAT'd / cloud VM so LiveKit advertises the public IP.
           use_external_ip: true
         keys:
           "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}": "${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET}"
@@ -31,9 +26,22 @@ services:
           api_key: "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}"
           urls:
             - "${LIVEKIT_WEBHOOK_URL:?set LIVEKIT_WEBHOOK_URL}"
+    # 7880 is NOT published - Traefik routes the domain to it over dokploy-network
+    # (set the domain's Container Port to 7880 in Dokploy, HTTPS on).
+    expose:
+      - "7880"
+    # Media must reach the host directly; the proxy can't carry it. Small range,
+    # safe to publish.
+    ports:
+      - "7881:7881/tcp"
+      - "7882-7892:7882-7892/udp"
     deploy:
       resources:
         limits:
           memory: 2G
         reservations:
           memory: 512M
+
+networks:
+  dokploy-network:
+    external: true
